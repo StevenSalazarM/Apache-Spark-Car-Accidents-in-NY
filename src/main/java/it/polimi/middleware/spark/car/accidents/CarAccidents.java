@@ -39,7 +39,7 @@ import it.polimi.middleware.spark.tutorial.utils.LogUtils;
  * Version 2. Exemplifies the benefits of persisting intermediate results to
  * enable reuse.
  */
-public class Bank {
+public class CarAccidents {
 	public static void main(String[] args) {
 		LogUtils.setLogLevel();
 
