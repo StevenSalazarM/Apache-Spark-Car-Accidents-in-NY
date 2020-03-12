@@ -10,9 +10,7 @@ import static org.apache.spark.sql.functions.*;
 //import static org.apache.spark.sql.functions.sum;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Scanner;
 
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -21,18 +19,15 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
-import com.google.common.base.Functions;
 
 import it.polimi.middleware.spark.tutorial.utils.LogUtils;
-import scala.Tuple3;
-
 
 
 public class CarAccidents {
 	public static void main(String[] args) {
 		LogUtils.setLogLevel();
 
-		final String master = args.length > 0 ? args[0] : "local[4]";
+		final String master = args.length > 0 ? args[0] : "local[*]";
 		final String filePath = args.length > 1 ? args[1] : "./";
 
 		final SparkSession spark = SparkSession //
@@ -122,14 +117,12 @@ public class CarAccidents {
 											ds_with_correct_nums.col("FAKETOTAL_I").equalTo(ds_with_correct_nums.col("TOTAL_I")).and(
 											ds_with_correct_nums.col("FAKETOTAL_K").equalTo(ds_with_correct_nums.col("TOTAL_K"))))
 											;
-		
+		ds_corrected.cache();
 		
 	// Q1 Number of lethal accidents per week throughout the entire dataset
 		
-	//	System.out.println("BEFORE FILTER OF 0: "+ds_corrected.count());
 		// We are interested only in lethal accidents
 		final Dataset<Row> ds_lethal_accidents = ds_corrected.filter(ds_corrected.col("TOTAL_K").gt(0));
-	//	System.out.println("AFTER FILTER OF 0: "+ds_lethal_accidents.count());
 
 		// Also, we are interested in group those accidents by YEAR and WEEK
 		// so we should create those two columns and count the number of accidents (at this point accidents are only lethal)
@@ -140,6 +133,7 @@ public class CarAccidents {
 		
 		final Dataset<Row> q1=ds_le_per_week.withColumnRenamed("sum(TOTAL_K)", "N. LETHAL ACCIDENTS").orderBy("YEAR","WEEK");
 		
+		System.out.println("Query 1:");
 		q1.show();
 		
 		
@@ -177,6 +171,7 @@ public class CarAccidents {
 											  .drop("sum(TOTAL_K)")
 											  .withColumnRenamed("count(UNIQUE KEY)", "N. Accidents")
 											  .orderBy("CONTRIBUTING FACTOR");
+		System.out.println("Query 2:");
 		q2_percentage.show();
 		
 	/*
@@ -212,7 +207,7 @@ public class CarAccidents {
 		//			 so we should get (C1,key)->tot_k, (C2,key)->tot_k, etc for each row
 		//			-Reduce by Keys -> so if we have (aC1,1234)->1, (aC1,1234)->1  ... due to a double aC1 in a row (that should be counted only once)
 		//			 we should reduce the key in each map column
-		//			I'm not sure how much it would cost but i believe that reducing however implies some sort of shuffling even if we are just dealing
+		//			I'm not sure how much it would cost but i believe that reducing implies some sort of shuffling even if we are just dealing
 		//			with a single row, the idea is similar to the usage of a dictionary that do not maintain the constraint about no duplicate keys
 		//			but we remove them by reducingByKey
 		
@@ -239,17 +234,33 @@ public class CarAccidents {
 		// so it was a good idea to create columns WEEK and YEAR after filtering.
 		// here we need the number of accidents so we should redo the operations performed before by using ds_corrected and not
 		// a cached version of ds_lethal_accidents_per_week or ds_lethal_accidents.
+
+		final Dataset<Row> ds_borough_no_null = ds_corrected.filter(ds_corrected.col("BOROUGH").isNotNull());
+		final Dataset<Row> ds_w_n_y = ds_borough_no_null.withColumn("WEEK",weekofyear(to_date(ds_borough_no_null.col("DATE"),"MM/dd/yyyy")))
+												  .withColumn("YEAR", year(to_date(ds_borough_no_null.col("DATE"),"MM/dd/yyyy")))
+												  ;
 		
-		final Dataset<Row> ds_with_week_n_year = ds_corrected.withColumn("WEEK",weekofyear(to_date(ds_corrected.col("DATE"),"MM/dd/yyyy")))
-				.withColumn("YEAR", year(to_date(ds_lethal_accidents.col("DATE"),"MM/dd/yyyy")));
-		final Dataset<Row> q3 = ds_with_week_n_year.groupBy("BOROUGH","YEAR","WEEK","TOTAL_K")
-													.agg(count("UNIQUE KEY").as("N. Accidents"),
-														 count(ds_with_week_n_year.col("TOTAL_K").gt(0)).as("N. Lethal"));
-
-		q3.show();
-		Scanner a = new Scanner(System.in);
-		a.nextLine();
-		spark.close();
-
+		final Dataset<Row> q3_with_lethal_column= ds_w_n_y.withColumn("LETHAL?",when(ds_w_n_y.col("TOTAL_K").gt(0), 1)
+																							.otherwise(0));
+		/*   così per BRONX viene Num. accidents: 91180 e Num lethal: 107 -> non so come 
+	 	
+	 	final Dataset<Row> q3 = q3_with_lethal_column.groupBy("BOROUGH")
+												 .agg(count("UNIQUE KEY").as("N. Accidents"),
+													 sum("LETHAL?").as("sum(Lethal)"))
+												 .orderBy("BOROUGH")
+												;
+		 */
+		
+		// in questo modo invece viene BRONX, year, week, number of accidents in that week, avg(lethal accidents)
+		// for example if we have a 5 accidents in a given week and 3 were lethal the average is 3/5 
+		// in general there are many weeks that did no have any lethal accident so we have many avg(lethal) 0
+		final Dataset<Row> q3 = q3_with_lethal_column.groupBy("BOROUGH","YEAR","WEEK")
+													 .agg(count("UNIQUE KEY").as("N. Accidents"),
+														 avg("LETHAL?").as("avg(Lethal)"))
+													 .orderBy("BOROUGH","YEAR","WEEK")
+													;
+		System.out.println("Query 3:");
+		// avg returns many floating values so we will round them to the 3rd number
+		q3.withColumn("avg(Lethal)",bround(q3.col("avg(Lethal)"),3)).show();
 	}
 }
