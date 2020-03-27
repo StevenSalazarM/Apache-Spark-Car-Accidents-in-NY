@@ -11,6 +11,7 @@ import static org.apache.spark.sql.functions.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -82,8 +83,7 @@ public class CarAccidents {
 			    .option("delimiter", ",")
 			    .option("inferSchema", "false")
 			    .schema(mySchema)//
-			    //.csv(filePath + "files/sample.csv");
-			    .csv(filePath+"files/NYPD_Motor_Vehicle_Collisions.csv");
+			    .csv(filePath+"files/NYPD_Motor_Vehicle_Collisions2.csv");
 		
 		
 	// FILTERING INCORRECT VALUES: each NUM_PERSON must be equal to SUM(N. OF PEDESTRIANS, N. OF CYCLIST, N. OF MOTORIST)
@@ -104,6 +104,7 @@ public class CarAccidents {
 													.drop("NUMBER OF CYCLIST KILLED")
 													.drop("NUMBER OF MOTORIST KILLED")
 													.withColumnRenamed("NUMBER OF PERSONS KILLED", "FAKETOTAL_K")
+													
 													// for Query 2, it will be useful to change the name the of CONTRIBUTING FACTORS
 													.withColumnRenamed("CONTRIBUTING FACTOR VEHICLE 1", "C1")
 													.withColumnRenamed("CONTRIBUTING FACTOR VEHICLE 2", "C2")
@@ -128,12 +129,12 @@ public class CarAccidents {
 		// so we should create those two columns and count the number of accidents (at this point accidents are only lethal)
 		final Dataset<Row> ds_le_per_week = ds_lethal_accidents.withColumn("WEEK",weekofyear(to_date(ds_lethal_accidents.col("DATE"),"MM/dd/yyyy")))
 												.withColumn("YEAR", year(to_date(ds_lethal_accidents.col("DATE"),"MM/dd/yyyy")))
-												.groupBy("YEAR","WEEK").agg(count("TOTAL_K"));
+												.groupBy("YEAR","WEEK").agg(count("TOTAL_K").as("N. LETHAL ACCIDENTS"));
 		
 		
-		final Dataset<Row> q1=ds_le_per_week.withColumnRenamed("sum(TOTAL_K)", "N. LETHAL ACCIDENTS").orderBy("YEAR","WEEK");
+		final Dataset<Row> q1=ds_le_per_week.orderBy("YEAR","WEEK");
 		
-		System.out.println("Query 1:");
+	//	System.out.println("Query 1:");
 		q1.show();
 		
 		
@@ -152,16 +153,17 @@ public class CarAccidents {
 		// then create a distinct array for each row, the array may contain null values e.g. [A,],[A,,B],[] or [A,B,]
 		final Dataset<Row> df_list_of_C = ds_corrected.select((array_distinct(array("C1","C2","C3","C4","C5"))).as("C"),
 																ds_corrected.col("UNIQUE KEY"),ds_corrected.col("TOTAL_K"));
-		
+	//	System.out.println("after disctinct: "+df_list_of_C.count());
 		// before using explode it is a good practice to filter the null values in order to minimize the amount of data that will get added
 		// even if explode seems a operation that requires a huge amount of computation, it works better than multiple joins
 		// However, if the max amount of bytes per partition is high we may end up without HEAP SPACE!
 		// TODO: check the performance obtained by reducing the default size of partitions (128 MB)
 		
 		final Dataset<Row> df_list_of_C_no_null = df_list_of_C.withColumn("C_no_null",array_except(df_list_of_C.col("C"),array(lit(null))));
-					
+	//	System.out.println("after filtering null values"+df_list_of_C_no_null.count());			
 		final Dataset<Row> df_exploded = df_list_of_C_no_null.withColumn("CONTRIBUTING FACTOR",explode(df_list_of_C_no_null.col("C_no_null")));
-		
+	//	System.out.println("after filtering explode"+df_exploded.count());			
+
 		// after using explode, the idea is to count the number of accidents per contributing factor and sum the total number of deaths
 		final Dataset<Row> q2 = df_exploded.groupBy("CONTRIBUTING FACTOR").agg(count("UNIQUE KEY"),sum("TOTAL_K"));	
 		
@@ -171,14 +173,17 @@ public class CarAccidents {
 											  .drop("sum(TOTAL_K)")
 											  .withColumnRenamed("count(UNIQUE KEY)", "N. Accidents")
 											  .orderBy("CONTRIBUTING FACTOR");
-		System.out.println("Query 2:");
+//		System.out.println("Query 2:");
 		q2_percentage.show();
 		
 	/*
+	 * the reason why explode is better than multiple self-joins is explained here at min 28-30:
+	 * https://www.youtube.com/watch?time_continue=1835&v=aq23P8r7pTo&feature=emb_logo 
+	 * 
 		// Option 2) Self-joins
 		//			- Separate columns C1 C2 C3 C4 C5 and 'create' 5 tables: |C1-UNIQUE KEY-TOTAL_K|  |C2-UNIQUE KEY-TOTAL_K| ... 
 		//			- Perform 4 self-joins and then group and count by UNIQUE KEY and sum TOTAL_K (maybe, i didn't complete this ... check below)
-		//			- However, this may cost more than a simple explode since we have many null values that get filtered
+		//			- However, this may cost more than a simple explode since we have many null values that get filtered by using array_except
 		
 		// TEST WITH MULTIPLE JOINS		
 		//	final Dataset<Row> ds_con_1 = ds_corrected.select("CONTRIBUTING FACTOR VEHICLE 1","UNIQUE KEY","TOTAL_K");//.agg(count("CONTRIBUTING FACTOR VEHICLE 1").as("N. ACCIDENTS"),sum("TOTAL_K"));
@@ -227,8 +232,8 @@ public class CarAccidents {
 	//	as  well  as  the  average  number  of  lethal  accidents  that  the borough had per week.
 		
 		// It may seem tempting to use the dataframe of the first query and then groupBy BOROUGH, however it must be considered that
-		// in the first query it was not necessary to count the number of accidents, so a good practice is to filter them before using groupBy
-		// and before creating the two columns WEEK AND YEAR 
+		// in the first query it was not necessary to count the number of accidents and that a good practice is to filter dataframes before using groupBy
+		// so we add two columns ( WEEK AND YEAR ) for a subset of the initial rows
 		// if you print the number of rows before applying the filter it will be 948198
 		// and after applying the filter it will be 1076
 		// so it was a good idea to create columns WEEK and YEAR after filtering.
@@ -242,7 +247,8 @@ public class CarAccidents {
 		
 		final Dataset<Row> q3_with_lethal_column= ds_w_n_y.withColumn("LETHAL?",when(ds_w_n_y.col("TOTAL_K").gt(0), 1)
 																							.otherwise(0));
-		/*   così per BRONX viene Num. accidents: 91180 e Num lethal: 107 -> non so come 
+		
+		/*   così per BRONX viene Num. accidents: 91180 e Num lethal: 107 -> non so come hai trovato 46% :thinking:
 	 	
 	 	final Dataset<Row> q3 = q3_with_lethal_column.groupBy("BOROUGH")
 												 .agg(count("UNIQUE KEY").as("N. Accidents"),
@@ -258,9 +264,12 @@ public class CarAccidents {
 													 .agg(count("UNIQUE KEY").as("N. Accidents"),
 														 avg("LETHAL?").as("avg(Lethal)"))
 													 .orderBy("BOROUGH","YEAR","WEEK")
-													;
-		System.out.println("Query 3:");
+		 											;
+	//	System.out.println("Query 3:");
 		// avg returns many floating values so we will round them to the 3rd number
-		q3.withColumn("avg(Lethal)",bround(q3.col("avg(Lethal)"),3)).show();
+		q3.withColumn("avg(Lethal)",bround(q3.col("avg(Lethal)"),3));
+		final Dataset<Row> q3_2 = q3.withColumn("avg(Lethal)",bround(q3.col("avg(Lethal)"),3));
+		q3_2.show();
+		
 	}
 }
