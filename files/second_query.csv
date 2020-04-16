@@ -46,3 +46,52 @@ Unsafe Speed,2411,0.25
 Unspecified,786490,0.1
 View Obstructed/Limited,4124,0.22
 Windshield Inadequate,51,0.0
+=======
+Accelerator Defective,430,0.0
+Aggressive Driving/Road Rage,3291,0.18
+Alcohol Involvement,7758,0.43
+Animals Action,500,0.0
+Backing Unsafely,28661,0.06
+Brakes Defective,2521,0.0
+Cell Phone (hand-held),125,0.0
+Cell Phone (hands-free),231,0.0
+Driver Inattention/Distraction,126530,0.09
+Driver Inexperience,13099,0.1
+Driverless/Runaway Vehicle,67,0.0
+Drugs (Illegal),564,0.53
+Failure to Keep Right,2018,0.0
+Failure to Yield Right-of-Way,44252,0.19
+Fatigued/Drowsy,54783,0.01
+Fell Asleep,1554,0.51
+Following Too Closely,8158,0.2
+Glare,2005,0.05
+Headlights Defective,75,0.0
+Illness,2613,0.04
+Lane Marking Improper/Inadequate,503,0.0
+Lost Consciousness,22448,0.04
+Obstruction/Debris,1844,0.11
+Other Electronic Device,2484,0.12
+Other Lighting Defects,83,0.0
+Other Vehicular,34281,0.04
+Outside Car Distraction,11521,0.04
+Oversized Vehicle,6191,0.0
+Passenger Distraction,5096,1.06
+Passing or Lane Usage Improper,4030,0.1
+Pavement Defective,1072,0.37
+Pavement Slippery,10116,0.07
+Pedestrian/Bicyclist/Other Pedestrian Error/Confusion,727,0.55
+Physical Disability,10331,0.31
+Prescription Medication,17801,0.05
+Reaction to Other Uninvolved Vehicle,2951,0.0
+Shoulders Defective/Improper,46,0.0
+Steering Failure,858,0.0
+Tire Failure/Inadequate,875,0.11
+Tow Hitch Defective,90,1.11
+Traffic Control Device Improper/Non-Working,440,0.0
+Traffic Control Disregarded,13634,1.1
+Turning Improperly,25786,0.02
+Unsafe Lane Changing,3422,0.0
+Unsafe Speed,2411,0.25
+Unspecified,786490,0.1
+View Obstructed/Limited,4124,0.22
+Windshield Inadequate,51,0.0
