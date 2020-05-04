@@ -23,13 +23,14 @@ import org.apache.spark.storage.StorageLevel;
 
 import it.polimi.middleware.spark.tutorial.utils.LogUtils;
 
-public class CarAccidentsSixQueries {
+public class CarAccidents6Queries {
 	public static void main(String[] args) {
 		LogUtils.setLogLevel();
 
 		final String master = args.length > 0 ? args[0] : "local[*]";
 		final String filePath = args.length > 1 ? args[1] : "./files/";
 		final String testNumber = args.length > 2 ? args[2] : "0";
+		final String cache = args.length > 3 ? args[3] : "true";
 		final long test_id = System.currentTimeMillis();
 		final SparkSession spark = SparkSession //
 				.builder() //
@@ -99,8 +100,8 @@ public class CarAccidentsSixQueries {
 
 		final Dataset<Row> ds_corrected = ds_with_correct_nums.filter(ds_with_correct_nums.col("FAKETOTAL_I").equalTo(ds_with_correct_nums.col("TOTAL_I"))
 																		.and(ds_with_correct_nums.col("FAKETOTAL_K").equalTo(ds_with_correct_nums.col("TOTAL_K"))));
-
-		ds_corrected.cache();
+		
+		if(cache.equals("true")) {ds_corrected.cache();System.out.println("Caching");}
 
 		final Dataset<Row> ds_lethal_accidents = ds_corrected.filter(ds_corrected.col("TOTAL_K").gt(0));
 
@@ -130,24 +131,42 @@ public class CarAccidentsSixQueries {
 		final Dataset<Row> q4 = ds_lethal_accidents4.withColumn("WEEK", weekofyear(to_date(ds_lethal_accidents4.col("DATE"), "MM/dd/yyyy")))
 													.withColumn("YEAR", year(to_date(ds_lethal_accidents4.col("DATE"), "MM/dd/yyyy")))
 													.groupBy("YEAR", "WEEK").agg(count("TOTAL_K").as("N. LETHAL ACCIDENTS"));
-
 		q4.write().format("csv").save(filePath + testNumber + "_" + String.valueOf(test_id) + "/query4/");
+		
 		final Dataset<Row> ds_lethal_accidents5 = ds_corrected.filter(ds_corrected.col("TOTAL_K").gt(0));
-
 		final Dataset<Row> q5 = ds_lethal_accidents5.withColumn("WEEK", weekofyear(to_date(ds_lethal_accidents5.col("DATE"), "MM/dd/yyyy")))
 													.withColumn("YEAR", year(to_date(ds_lethal_accidents5.col("DATE"), "MM/dd/yyyy")))
 													.groupBy("YEAR", "WEEK").agg(count("TOTAL_K").as("N. LETHAL ACCIDENTS"));
-
 		q5.write().format("csv").save(filePath + testNumber + "_" + String.valueOf(test_id) + "/query5/");
-		final Dataset<Row> ds_lethal_accidents6 = ds_corrected.filter(ds_corrected.col("TOTAL_K").gt(0));
 
+		final Dataset<Row> ds_lethal_accidents6 = ds_corrected.filter(ds_corrected.col("TOTAL_K").gt(0));
 		final Dataset<Row> q6 = ds_lethal_accidents6.withColumn("WEEK", weekofyear(to_date(ds_lethal_accidents6.col("DATE"), "MM/dd/yyyy")))
 													.withColumn("YEAR", year(to_date(ds_lethal_accidents6.col("DATE"), "MM/dd/yyyy")))
 													.groupBy("YEAR", "WEEK").agg(count("TOTAL_K").as("N. LETHAL ACCIDENTS"));
-
 		q6.write().format("csv").save(filePath + testNumber + "_" + String.valueOf(test_id) + "/query6/");
 
-		ds_corrected.unpersist();
+/*		
+		final Dataset<Row> ds_lethal_accidents7 = ds_corrected.filter(ds_corrected.col("TOTAL_K").gt(0));
+		final Dataset<Row> q7 = ds_lethal_accidents7.withColumn("WEEK", weekofyear(to_date(ds_lethal_accidents7.col("DATE"), "MM/dd/yyyy")))
+				.withColumn("YEAR", year(to_date(ds_lethal_accidents7.col("DATE"), "MM/dd/yyyy")))
+				.groupBy("YEAR", "WEEK").agg(count("TOTAL_K").as("N. LETHAL ACCIDENTS"));
+		q7.write().format("csv").save(filePath + testNumber + "_" + String.valueOf(test_id) + "/query7/");
+
+		final Dataset<Row> ds_lethal_accidents8 = ds_corrected.filter(ds_corrected.col("TOTAL_K").gt(0));
+		final Dataset<Row> q8 = ds_lethal_accidents8.withColumn("WEEK", weekofyear(to_date(ds_lethal_accidents8.col("DATE"), "MM/dd/yyyy")))
+				.withColumn("YEAR", year(to_date(ds_lethal_accidents8.col("DATE"), "MM/dd/yyyy")))
+				.groupBy("YEAR", "WEEK").agg(count("TOTAL_K").as("N. LETHAL ACCIDENTS"));
+		q8.write().format("csv").save(filePath + testNumber + "_" + String.valueOf(test_id) + "/query8/");
+*/
+/*		
+		final Dataset<Row> ds_lethal_accidents9 = ds_corrected.filter(ds_corrected.col("TOTAL_K").gt(0));
+		final Dataset<Row> q9 = ds_lethal_accidents9.withColumn("WEEK", weekofyear(to_date(ds_lethal_accidents9.col("DATE"), "MM/dd/yyyy")))
+				.withColumn("YEAR", year(to_date(ds_lethal_accidents9.col("DATE"), "MM/dd/yyyy")))
+				.groupBy("YEAR", "WEEK").agg(count("TOTAL_K").as("N. LETHAL ACCIDENTS"));
+		q9.write().format("csv").save(filePath + testNumber + "_" + String.valueOf(test_id) + "/query9/");
+*/
+		if(cache.equals("true"))ds_corrected.unpersist();
 
 	}
 }
+

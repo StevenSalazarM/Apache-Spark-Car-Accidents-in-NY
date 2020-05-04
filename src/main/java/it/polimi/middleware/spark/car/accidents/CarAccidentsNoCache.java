@@ -18,7 +18,7 @@ import org.apache.spark.storage.StorageLevel;
 import it.polimi.middleware.spark.tutorial.utils.LogUtils;
 
 
-public class CarAccidents {
+public class CarAccidentsNoCache {
     public static void main(String[] args) {
         LogUtils.setLogLevel();
 
@@ -29,7 +29,7 @@ public class CarAccidents {
         final SparkSession spark = SparkSession //
             .builder() //
             .master(master) //
-            .appName("Car Accidents in New York") //
+            .appName("Car Accidents in New York (cache version)") //
             .getOrCreate();
 
         
@@ -82,6 +82,7 @@ public class CarAccidents {
         
         
     // FILTERING INCORRECT VALUES: each NUM_PERSON must be equal to SUM(N. OF PEDESTRIANS, N. OF CYCLIST, N. OF MOTORIST)
+        							
         
         // First we create a column that contains the real number of persons injured and persons killed
         final Dataset<Row> ds_with_correct_nums = ds.withColumn("TOTAL_I",ds.col("NUMBER OF PEDESTRIANS INJURED")
@@ -114,32 +115,39 @@ public class CarAccidents {
                                             ds_with_correct_nums.col("FAKETOTAL_I").equalTo(ds_with_correct_nums.col("TOTAL_I")).and(
                                             ds_with_correct_nums.col("FAKETOTAL_K").equalTo(ds_with_correct_nums.col("TOTAL_K"))))
                                             ;
-        // now we cache (save in memory or storage (if memory is not enough) the dataset since we dont want it to be loaded everytime for each query)
-        // caching takes more time due to writing phase that is hidden from the web UI (it is considered as computing time)                                  
-        ds_corrected.cache();
 
-        // we are dealing with 1 executor per worker, so we should have enough space in memory for each executor
-        // thus, cache acts in the same way of persist(memory_only)
-        //ds_corrected.persist(StorageLevel.MEMORY_ONLY());
-       
-
-    // Q1 Number of lethal accidents per week throughout the entire dataset
+        // Q1 Number of lethal accidents per week throughout the entire dataset
         
         // We are interested only in lethal accidents
         final Dataset<Row> ds_lethal_accidents = ds_corrected.filter(ds_corrected.col("TOTAL_K").gt(0));
 
-        // Also, we are interested in group those accidents by YEAR and WEEK
-        // so we should create those two columns and count the number of accidents (at this point accidents are only lethal)
-        final Dataset<Row> q1 = ds_lethal_accidents.withColumn("WEEK",weekofyear(to_date(ds_lethal_accidents.col("DATE"),"MM/dd/yyyy")))
-                                                               .withColumn("YEAR", year(to_date(ds_lethal_accidents.col("DATE"),"MM/dd/yyyy")))
-                                                .groupBy("YEAR","WEEK").agg(count("TOTAL_K").as("N. LETHAL ACCIDENTS"));
-        
-        
-        
-    //    System.out.println("Query 1:");
-        q1.show();
-    //    q1.write().format("csv").save(filePath+testNumber+"_"+String.valueOf(test_id)+"/query1/");
-        
+        // Also we need a column YEAR and WEEK that is obtained from DATE
+        final Dataset<Row> ds_lethal_accidents_week_year = ds_lethal_accidents.withColumn("WEEK",weekofyear(to_date(ds_lethal_accidents.col("DATE"),"MM/dd/yyyy")))
+                															   .withColumn("YEAR", year(to_date(ds_lethal_accidents.col("DATE"),"MM/dd/yyyy")))
+                															   ;
+        // Following the standard that is used by weekofyear we should consider two special cases for YEAR and WEEK
+        // If Week=1 and Month=12 then Year=Year+1
+        final Dataset<Row> ds_lethal_accidents_week_year_2 = ds_lethal_accidents_week_year.withColumn("CORRECT_YEAR1",
+                                        when(ds_lethal_accidents_week_year.col("WEEK").equalTo(1).and(
+                                            month(to_date(ds_lethal_accidents_week_year.col("DATE"),"MM/dd/yyyy")).equalTo(12))
+                                        , ds_lethal_accidents_week_year.col("YEAR").plus(1)).otherwise(ds_lethal_accidents_week_year.col("YEAR")));
+        // If Week=52 and Month=1 then Year=Year-1
+        final Dataset<Row> ds_lethal_accidents_week_year_3 = ds_lethal_accidents_week_year_2.withColumn("CORRECT_YEAR2",
+                                        when(ds_lethal_accidents_week_year_2.col("WEEK").geq(52).and(
+                                            month(to_date(ds_lethal_accidents_week_year_2.col("DATE"),"MM/dd/yyyy")).equalTo(1))
+                                                , ds_lethal_accidents_week_year_2.col("CORRECT_YEAR1").minus(1)).otherwise(ds_lethal_accidents_week_year_2.col("CORRECT_YEAR1")));
+      
+        // At this point accidents are only lethal and we have columns YEAR and WEEK so now we can group 
+        final Dataset<Row> q1 = ds_lethal_accidents_week_year_3.groupBy("CORRECT_YEAR2","WEEK").agg(count("TOTAL_K").as("N. LETHAL ACCIDENTS"))
+        														.orderBy("CORRECT_YEAR2", "WEEK")
+        														;
+
+        //System.out.println("Query 1:");
+        q1.show(20);
+        //q1.write().format("csv").save(filePath+testNumber+"_"+String.valueOf(test_id)+"/query1/");
+
+
+ 
     // Q2 Number  of  accidents  and  percentage  of  number  of  deaths  per  contributing  factor  in  the data set
     // I.e., for each contributing factor, we want to know how many accidents were due to that contributing
     // factor and what percentage of these accidents were also lethal.
@@ -155,7 +163,7 @@ public class CarAccidents {
         // then create a distinct array in each row, the array may contain null values e.g. [A,],[A,,B],[] or [A,B,]
         final Dataset<Row> df_list_of_C = ds_corrected.select((array_distinct(array("C1","C2","C3","C4","C5"))).as("C"),
                                                                 ds_corrected.col("UNIQUE KEY"),ds_corrected.col("TOTAL_K"));
-    //  System.out.println("after disctinct: "+df_list_of_C.count());
+    //  System.out.println("after distinct: "+df_list_of_C.count());
         // before using explode it is a good practice to filter the null values in order to minimize the amount of data that will get added
         // even if explode seems a operation that requires a huge amount of computation, it works better than multiple joins (thanks to the optimizer).
         // However, if the max amount of bytes per partition is high we may end up without HEAP SPACE!
@@ -175,13 +183,14 @@ public class CarAccidents {
                                                                                             .divide(q2.col("count(UNIQUE KEY)"))),2),lit("%")))
                                               .drop("sum(TOTAL_K)")
                                               .withColumnRenamed("count(UNIQUE KEY)", "N. ACCIDENTS")
+                                              .orderBy("CONTRIBUTING FACTOR")
                                               ;
-      q2_percentage.show();
-    //  q2_percentage.write().format("csv").save(filePath+testNumber+"_"+String.valueOf(test_id)+"/query2/");
+        q2_percentage.show();
+        //q2_percentage.write().format("csv").save(filePath+testNumber+"_"+String.valueOf(test_id)+"/query2/");
     
     /*
      * the reason why explode is better than multiple self-joins is explained here at min 28:
-     * https://www.youtube.com/watch?time_continue=1835&v=aq23P8r7pTo&feature=emb_logo 
+     * https://www.youtube.com/watch?v=aq23P8r7pTo
      * 
         // Option 2) Self-joins
         //          - Separate columns C1 C2 C3 C4 C5 and 'create' 5 tables: |C1-UNIQUE KEY-TOTAL_K|  |C2-UNIQUE KEY-TOTAL_K| ... 
@@ -208,7 +217,7 @@ public class CarAccidents {
         //      ds_con_1.show();
         //      ds_con_2.show();
         //  ^ it is not completed, it costs more since i tried a simple program to see if self-joins were creating new copies of the dataset
-        // and the answer is yes, it consideres a new copy for each join -> not the best solution for real applications
+        // and the answer is yes, it considers a new copy for each join -> not the best solution for real applications
  
         // Option 3) Map-Reduce (non ho seguito distributed systems e col Nesi ovviamente non ne abbiamo parlato)
         //          -Map C1, C2, C3, C4, C5  with key TOT_K (e forse anche UNIQUE KEY per contare accidents) 
@@ -222,10 +231,10 @@ public class CarAccidents {
         
     
         // Altre opzioni
-        //      4) salvarmi i 49 valori distinti che ci sono in ogni contributing factor e mettermi a contarli (come diceva il braga a lezione però attraverso un accumulator (esiste e si è solo accennato a lezione)))
+        //      4) salvarmi i 49 valori distinti che ci sono in ogni contributing factor e mettermi a contarli (come diceva il braga a lezione pero attraverso un accumulator (esiste ma l'abbiamo solo accennato a lezione)))
         //      5) vari self join (diverso dal 2, non mi ricordo esattamente come)
         //      6) add 49 columns (for each distinct contributing factor) and increase the counter (maybe through a User defined aggregate function?)
-        //      7) non mi ricordo l'ultimo .... forse era così: definisce una classe user defined aggregate function 
+        //      7) non mi ricordo l'ultimo .... forse era cosi: definisce una classe user defined aggregate function 
         //         e salvati i contatori... una specie di groupby count5C ... https://spark.apache.org/docs/latest/api/java/index.html
         //      7 molto simile a 6 solo che nel 6 si lavora sul dataframe e nel 7 su 49 variabili (volendo un container map<>) nella classe user defined aggregate function 
     */
@@ -236,23 +245,33 @@ public class CarAccidents {
     //  as  well  as  the  average  number  of  lethal  accidents  that  the borough had per week.
         
         // It may seem tempting to use the dataframe of the first query and then groupBy BOROUGH, however it must be considered that
-        // in the first query it was not necessary to count the number of accidents and that a good practice is to filter dataframes before using groupBy.
-        // Also caching implies writing in memory and it takes time, in the first query after the filter (to consider only lethal accidents)
-        // we get a very low number of rows so it makes query 1 to be completed really fast, using groupBy without the filter would increase a lot the computing time.
+        // in the first query it was not necessary to count the number of accidents and a good practice is to filter dataframes before using groupBy.
+        // In the first query after the filter (to consider only lethal accidents) we get a very low number of rows 
+        // so it makes query 1 to be completed really fast, using groupBy without the filter would increase a lot the computing time.
         // if you print the number of rows before applying the filter it will be 948198
         // and after applying the filter it will be 1076.
         // For query 3 we need the number of accidents so we should redo the operations performed before by using ds_corrected and not
         // a cached version of ds_lethal_accidents_per_week or ds_lethal_accidents.
 
-        final Dataset<Row> ds_borough_no_null = ds_corrected.filter(ds_corrected.col("BOROUGH").isNotNull());
-        final Dataset<Row> ds_w_n_y = ds_borough_no_null.withColumn("WEEK",weekofyear(to_date(ds_borough_no_null.col("DATE"),"MM/dd/yyyy")))
-                                                  .withColumn("YEAR", year(to_date(ds_borough_no_null.col("DATE"),"MM/dd/yyyy")))
-                                                  ;
-        
-        final Dataset<Row> q3_with_lethal_column= ds_w_n_y.withColumn("LETHAL?",when(ds_w_n_y.col("TOTAL_K").gt(0), 1)
-                                                                                            .otherwise(0));
-        
-        /*   così per BRONX viene Num. accidents: 91180 e Num lethal: 107 -> non so come hai trovato 46% :thinking:
+       final Dataset<Row> ds_borough_no_null = ds_corrected.filter(ds_corrected.col("BOROUGH").isNotNull());
+       final Dataset<Row> ds_w_n_y = ds_borough_no_null.withColumn("WEEK",weekofyear(to_date(ds_borough_no_null.col("DATE"),"MM/dd/yyyy")))
+               .withColumn("YEAR", year(to_date(ds_borough_no_null.col("DATE"),"MM/dd/yyyy")))
+               ;
+       final Dataset<Row> ds_w_n_y_2 = ds_w_n_y.withColumn("CORRECT_YEAR1",
+       								when(ds_w_n_y.col("WEEK").equalTo(1).and(
+       									month(to_date(ds_w_n_y.col("DATE"),"MM/dd/yyyy")).equalTo(12))
+       										,ds_w_n_y.col("YEAR").plus(1))
+       								.otherwise(ds_w_n_y.col("YEAR")));
+       final Dataset<Row> ds_w_n_y_3 = ds_w_n_y_2.withColumn("CORRECT_YEAR2",
+										when(ds_w_n_y_2.col("WEEK").geq(52).and(
+											month(to_date(ds_w_n_y_2.col("DATE"),"MM/dd/yyyy")).equalTo(1))
+												,ds_w_n_y_2.col("CORRECT_YEAR1").minus(1))
+										.otherwise(ds_w_n_y_2.col("CORRECT_YEAR1")));
+       
+       final Dataset<Row> q3_with_lethal_column= ds_w_n_y_3.withColumn("LETHAL?",when(ds_w_n_y_3.col("TOTAL_K").gt(0), 1)
+                                                                                           .otherwise(0));
+        /* TODO: ora che ho modificato YEAR ricalcola i risultati  
+         * cosi per BRONX viene Num. accidents: 91180 e Num lethal: 107 -> non so come hai trovato 46% :thinking:
         
         final Dataset<Row> q3 = q3_with_lethal_column.groupBy("BOROUGH")
                                                  .agg(count("UNIQUE KEY").as("N. Accidents"),
@@ -264,16 +283,17 @@ public class CarAccidents {
         // in questo modo invece viene BRONX, year, week, number of accidents in that week, avg(lethal accidents)
         // for example if we have a 5 accidents in a given week and 3 were lethal the average is 3/5 
         // in general there are many weeks that did no have any lethal accident so we have many avg(lethal) 0
-        final Dataset<Row> q3 = q3_with_lethal_column.groupBy("BOROUGH","YEAR","WEEK")
+        final Dataset<Row> q3 = q3_with_lethal_column.groupBy("BOROUGH","CORRECT_YEAR2","WEEK")
                                                      .agg(count("UNIQUE KEY").as("N. ACCIDENTS"),
                                                          avg("LETHAL?").as("avg(Lethal)"))
+                                                     .orderBy("BOROUGH","CORRECT_YEAR2","WEEK")
                                                     ;
         // avg returns many floating values so we will round them to the 3rd number
         final Dataset<Row> q3_2 = q3.withColumn("avg(LETHAL)",bround(q3.col("avg(Lethal)"),3));
         q3_2.show();
-    //    q3_2.write().format("csv").save(filePath+testNumber+"_"+String.valueOf(test_id)+"/query3/");
- 
-        ds_corrected.unpersist();
+        //q3_2.write().format("csv").save(filePath+testNumber+"_"+String.valueOf(test_id)+"/query3/");
+
         
     }
 }
+
