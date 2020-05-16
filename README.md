@@ -12,15 +12,18 @@ Number of accidents and average number of lethal accidents per week per borough.
 
 ## Solution
 The dataset that is used to perform the three queries is available at [NYPD_Motor_Vehicle_Collisions](http://ssmgames.altervista.org/NYPD_Motor_Vehicle_Collisions.csv).
+
 In order to complete the queries requested it was considered that:
 - In the dataset some rows contain incorrect values since:
 
- `# Persons Injured = # Cyclist Inj + # Pedestrians Inj + # Motorist Inj `
- and 
- `# Persons Killed = # Cyclist Kill + # Pedestrians Kill + # Motorist Kill `
+ `# Persons Injured = # Cyclist Injured + # Pedestrians Injured + # Motorist Injured `
+  
+  and 
+ 
+ `# Persons Killed = # Cyclist Killed + # Pedestrians Killed + # Motorist Killed `
 
 - From the dataset it is possible to see that in its structure it was not considered to have YEAR and WEEK as direct data, so it these two information had to be calculated from DATE.
-- There are 5 columns with the same domain called CONTRIBUTING FACTOR X that is be merged into a single array column.
+- There are 5 columns with the same domain called CONTRIBUTING FACTOR X that is merged into a single array column.
 
 ### Usage
 
@@ -48,7 +51,7 @@ In order to complete the queries requested it was considered that:
 
 6. Compile the project with maven
 
- > mvn package
+     > mvn package
 
 6. Submit the project through spark-submit, for example:
-> spark-submit --class it.polimi.middleware.spark.car.accidents.CarAccidentsCache car_accidents.jar spark://master_ip:port dataset_directory/ test_number 
+     > spark-submit --class it.polimi.middleware.spark.car.accidents.CarAccidentsCache car_accidents.jar spark://master_ip:port dataset_directory/ test_number 
