@@ -229,14 +229,6 @@ public class CarAccidentsNoCache {
         //          but we remove them by reducingByKey, however this may increase a lot the dataset size, more than explode. Experts suggests that we should 
         //          trust the optimizer and use the functions already present in the high level API. (I know it sounds weird but I watched many videos about spark and they kept repeating it)
         
-    
-        // Altre opzioni
-        //      4) salvarmi i 49 valori distinti che ci sono in ogni contributing factor e mettermi a contarli (come diceva il braga a lezione pero attraverso un accumulator (esiste ma l'abbiamo solo accennato a lezione)))
-        //      5) vari self join (diverso dal 2, non mi ricordo esattamente come)
-        //      6) add 49 columns (for each distinct contributing factor) and increase the counter (maybe through a User defined aggregate function?)
-        //      7) non mi ricordo l'ultimo .... forse era cosi: definisce una classe user defined aggregate function 
-        //         e salvati i contatori... una specie di groupby count5C ... https://spark.apache.org/docs/latest/api/java/index.html
-        //      7 molto simile a 6 solo che nel 6 si lavora sul dataframe e nel 7 su 49 variabili (volendo un container map<>) nella classe user defined aggregate function 
     */
         
         
@@ -270,17 +262,6 @@ public class CarAccidentsNoCache {
        
        final Dataset<Row> q3_with_lethal_column= ds_w_n_y_3.withColumn("LETHAL?",when(ds_w_n_y_3.col("TOTAL_K").gt(0), 1)
                                                                                            .otherwise(0));
-        /* TODO: ora che ho modificato YEAR ricalcola i risultati  
-         * cosi per BRONX viene Num. accidents: 91180 e Num lethal: 107 -> non so come hai trovato 46% :thinking:
-        
-        final Dataset<Row> q3 = q3_with_lethal_column.groupBy("BOROUGH")
-                                                 .agg(count("UNIQUE KEY").as("N. Accidents"),
-                                                     sum("LETHAL?").as("sum(Lethal)"))
-                                                 .orderBy("BOROUGH")
-                                                ;
-         */
-        
-        // in questo modo invece viene BRONX, year, week, number of accidents in that week, avg(lethal accidents)
         // for example if we have a 5 accidents in a given week and 3 were lethal the average is 3/5 
         // in general there are many weeks that did no have any lethal accident so we have many avg(lethal) 0
         final Dataset<Row> q3 = q3_with_lethal_column.groupBy("BOROUGH","CORRECT_YEAR2","WEEK")
@@ -292,7 +273,7 @@ public class CarAccidentsNoCache {
         final Dataset<Row> q3_2 = q3.withColumn("avg(LETHAL)",bround(q3.col("avg(Lethal)"),3));
         q3_2.show();
         //q3_2.write().format("csv").save(filePath+testNumber+"_"+String.valueOf(test_id)+"/query3/");
-
+        //Scanner a = new Scanner(System.in);a.nextLine();
         
     }
 }

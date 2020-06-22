@@ -222,8 +222,8 @@ public class CarAccidentsCache {
         //  ^ it is not completed, it costs more since i tried a simple program to see if self-joins were creating new copies of the dataset
         // and the answer is yes, it considers a new copy for each join -> not the best solution for real applications
  
-        // Option 3) Map-Reduce (non ho seguito distributed systems e col Nesi ovviamente non ne abbiamo parlato)
-        //          -Map C1, C2, C3, C4, C5  with key TOT_K (e forse anche UNIQUE KEY per contare accidents) 
+        // Option 3) Map-Reduce
+        //          -Map C1, C2, C3, C4, C5  with key TOT_K (maybe also UNIQUE_KEY, so we can count accidents) 
         //           so we should get (C1,key)->tot_k, (C2,key)->tot_k, etc for each row
         //          -Reduce by Keys -> so if we have (aC1,1234)->1, (aC1,1234)->1  ... due to a double aC1 in a row (that should be counted only once)
         //           we should reduce the key in each map column
@@ -233,14 +233,11 @@ public class CarAccidentsCache {
         //          trust the optimizer and use the functions already present in the high level API. (I know it sounds weird but I watched many videos about spark and they kept repeating it)
         
     
-        // Altre opzioni
-        //      4) salvarmi i 49 valori distinti che ci sono in ogni contributing factor e mettermi a contarli (come diceva il braga a lezione pero attraverso un accumulator (esiste ma l'abbiamo solo accennato a lezione)))
-        //      5) vari self join (diverso dal 2, non mi ricordo esattamente come)
-        //      6) add 49 columns (for each distinct contributing factor) and increase the counter (maybe through a User defined aggregate function?)
-        //      7) non mi ricordo l'ultimo .... forse era cosi: definisce una classe user defined aggregate function 
-        //         e salvati i contatori... una specie di groupby count5C ... https://spark.apache.org/docs/latest/api/java/index.html
-        //      7 molto simile a 6 solo che nel 6 si lavora sul dataframe e nel 7 su 49 variabili (volendo un container map<>) nella classe user defined aggregate function 
-    */
+        // some other options
+        //      4) save 48 distinct values and use a counter for each (probably using some sort of broadcast variable)
+        //      5) add 49 columns (for each distinct contributing factor) and increase the counter (maybe through a User defined aggregate function?)
+        //      6) define an user defined aggregate function, use counters and some sort of groupby countC1 countC2 ... https://spark.apache.org/docs/latest/api/java/index.html
+      */
         
         
     // Q3 Number of accidents and average number of lethal accidents per week per borough.
@@ -273,17 +270,6 @@ public class CarAccidentsCache {
         
         final Dataset<Row> q3_with_lethal_column= ds_w_n_y_3.withColumn("LETHAL?",when(ds_w_n_y_3.col("TOTAL_K").gt(0), 1)
                                                                                             .otherwise(0));
-        /* TODO: ora che ho modificato YEAR ricalcola i risultati  
-         * cosi per BRONX viene Num. accidents: 91180 e Num lethal: 107 -> non so come hai trovato 46% :thinking:
-        
-        final Dataset<Row> q3 = q3_with_lethal_column.groupBy("BOROUGH")
-                                                 .agg(count("UNIQUE KEY").as("N. Accidents"),
-                                                     sum("LETHAL?").as("sum(Lethal)"))
-                                                 .orderBy("BOROUGH")
-                                                ;
-         */
-        
-        // in questo modo invece viene BRONX, year, week, number of accidents in that week, avg(lethal accidents)
         // for example if we have a 5 accidents in a given week and 3 were lethal the average is 3/5 
         // in general there are many weeks that did no have any lethal accident so we have many avg(lethal) 0
         final Dataset<Row> q3 = q3_with_lethal_column.groupBy("BOROUGH","CORRECT_YEAR2","WEEK")
