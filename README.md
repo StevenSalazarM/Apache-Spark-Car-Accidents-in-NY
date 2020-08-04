@@ -57,17 +57,13 @@ In order to complete the queries requested it was considered that:
      > spark-submit --class it.polimi.middleware.spark.car.accidents.CarAccidentsCache car_accidents.jar spark://master_ip:port dataset_directory/ test_number 
      
 ## Results
-### First Query
-Click [here](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/show_q1.md) for the code used to generate this bar chart.
-
+### [First Query](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/show_q1.md)
 ![](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/first_query.png)
 
-### Second Query
-Click [here](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/show_q2.md) for the code used to generate this bar chart.
-
+### [Second Query](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/show_q2.md)
+The decimal number above each bar indicates the percentage of accidents that were also lethal.
 ![](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/second_query.png)
 
-### Third Query
-Click [here](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/show_q3.md) for the code used to generate this bar chart.
-
+### [Third Query](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/show_q3.md)
+The decimal number above each bar indicates the average number of lethal accidents that the borough had in a week.
 ![](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/third_query.png)
