@@ -25,9 +25,9 @@ In order to complete the queries requested it was considered that:
 - From the dataset it is possible to see that in its structure it was not considered to have YEAR and WEEK as direct data, so it these two information had to be calculated from DATE.
 - There are 5 columns with the same domain called CONTRIBUTING FACTOR X that is merged into a single array column.
 
-### Usage
+## Usage
 
-#### Local Mode
+### Local Mode
 1. Clone the project.
 
 2. Download the dataset.
@@ -38,7 +38,7 @@ In order to complete the queries requested it was considered that:
 
 5. Run as Java Application without passing any parameter.
 
-#### Cluster Mode
+### Cluster Mode
 1. Download Spark 2.4+ and configure it as you like.
 
 2. Start Spark and make sure that you connect to at least one worker.
@@ -55,3 +55,19 @@ In order to complete the queries requested it was considered that:
 
 6. Submit the project through spark-submit, for example:
      > spark-submit --class it.polimi.middleware.spark.car.accidents.CarAccidentsCache car_accidents.jar spark://master_ip:port dataset_directory/ test_number 
+     
+## Results
+### First Query
+Click [here](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/show_q1.md) for the code used to generate this bar chart.
+
+![](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/first_query.png)
+
+### Second Query
+Click [here](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/show_q2.md) for the code used to generate this bar chart.
+
+![](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/second_query.png)
+
+### Third Query
+Click [here](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/show_q3.md) for the code used to generate this bar chart.
+
+![](https://github.com/StevenSalazarM/Apache-Spark-Car-Accidents-in-NY/blob/master/results/third_query.png)
