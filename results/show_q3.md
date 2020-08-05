@@ -24,10 +24,10 @@ df = pd.read_csv("files/third_query.csv", sep=",",names=["Borough","Year","Week"
 
 
 ```python
-# Make a dropdown to select the Year
+# Make a dropdown to select the Borough
 borough = widgets.Dropdown(
     options=list(df['Borough'].unique()),
-    value='BRONX',
+    value='QUEENS',
     description='Borough:',
 )
 # Make a dropdown to select the Year
